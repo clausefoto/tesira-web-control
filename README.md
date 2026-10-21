@@ -4,7 +4,7 @@ A mobile-friendly dashboard for main and subwoofer volume on a Biamp Tesira DSP.
 
 ## Status
 
-Initial implementation, tested against a simulated DSP. **Physical hardware writes and the Docker image still need validation on Unraid.** Read commands and connectivity were previously verified on the target DSP.
+Initial implementation, tested against a simulated DSP. Dashboard reads, writes, and Docker deployment have been reported working on the target Unraid/DSP setup. The persistent-connection latency improvement still needs timing verification on hardware.
 
 ## Features
 
@@ -91,7 +91,7 @@ Tests cover Telnet negotiation and fragmented replies, read-only startup behavio
 
 Phone browser → Node.js HTTP server on Unraid → Tesira Telnet/TTP.
 
-The backend serializes operations. Each command uses a short-lived Telnet session so a delayed reply cannot be mistaken for another command's acknowledgment. State uses periodic reads rather than subscriptions in this version. A main update uses six acknowledged per-channel commands followed by actual level reads.
+The backend serializes operations over one persistent Telnet session, with TCP_NODELAY enabled. On a timeout or disconnect it discards the session, preventing a late reply from satisfying a later command. Subsequent operations reconnect without automatically replaying writes. State uses periodic reads rather than subscriptions in this version. A main update uses six acknowledged per-channel commands followed by actual level reads.
 
 ## Access and troubleshooting
 

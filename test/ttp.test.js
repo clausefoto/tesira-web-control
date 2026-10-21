@@ -3,12 +3,12 @@ import assert from 'node:assert/strict';
 import net from 'node:net';
 import {DSP, command, parseValue} from '../ttp.js';
 
-async function simulator(t) {
+async function simulator(t, handshakeDelay = 5) {
   const main=Array(6).fill(-6);let sub=12,fail=false,connections=0;const writes=[];const sockets=new Set();
   const server=net.createServer(socket=>{
-    connections++;sockets.add(socket);socket.on('close',()=>sockets.delete(socket));
+    connections++;socket.setNoDelay(true);sockets.add(socket);socket.on('close',()=>sockets.delete(socket));
     socket.write(Buffer.from([255,253]));
-    setTimeout(()=>{if(!socket.destroyed){socket.write(Buffer.from([24]));socket.write('Welcome to the Tesira Text Protocol Server...\r\n');}},5);
+    setTimeout(()=>{if(!socket.destroyed){socket.write(Buffer.from([24]));socket.write('Welcome to the Tesira Text Protocol Server...\r\n');}},handshakeDelay);
     let text='';socket.on('data',data=>{
       // Remove Telnet refusal replies before reading application text.
       text+=data.toString('latin1').replace(/\xff[\xfc\xfe]./g,'');
@@ -58,4 +58,13 @@ test('a silent DSP times out',async t=>{
  const sockets=new Set(),server=net.createServer(s=>{sockets.add(s);s.on('close',()=>sockets.delete(s));});
  await new Promise(r=>server.listen(0,'127.0.0.1',r));t.after(()=>{for(const s of sockets)s.destroy();server.close();});
  await assert.rejects(command('127.0.0.1',server.address().port,'Level5 get levels',40),/timed out/);
+});
+
+test('main update reuses one handshake and reconnects without replaying writes',async t=>{
+ const s=await simulator(t,150);
+ await s.dsp.get();assert.equal(s.connections,1);
+ const started=performance.now();await s.dsp.set('main',-7);
+ assert.equal(s.connections,1);assert.ok(performance.now()-started<500,'warm update should avoid handshake delays');
+ const writes=s.writes.length;s.dsp.close();await s.dsp.get();
+ assert.equal(s.connections,2);assert.equal(s.writes.length,writes);
 });

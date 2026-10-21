@@ -54,7 +54,7 @@ No write commands have been tested during this project's verification so far.
 
 ## Initial implementation
 
-The backend now uses acknowledged per-channel writes and readback, tested against a simulator. Physical writes remain unverified. It polls actual state every three seconds while the page is visible; subscriptions are deferred. Each command owns a short-lived Telnet session, and operations are serialized.
+The backend now uses acknowledged per-channel writes and readback, tested against a simulator. Physical writes have since been reported working. It polls actual state every three seconds while the page is visible; subscriptions are deferred. Commands now share a persistent Telnet session with TCP_NODELAY. Operations are serialized. A timeout or disconnect discards the session; subsequent operations reconnect without replaying writes. This avoids repeated login/banner delays during a six-channel adjustment.
 
 ## Backend requirements
 

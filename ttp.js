@@ -1,41 +1,73 @@
 import net from 'node:net';
 
-// A transaction owns its connection: a late response can never satisfy a later command.
-export function command(host, port, text, timeout = 4000) {
-  return new Promise((resolve, reject) => {
-    const socket = net.createConnection({host, port});
-    let buffer = '', state = 'data', verb, sent = false;
-    const timer = setTimeout(() => finish(new Error('DSP response timed out')), timeout);
-    function finish(error, value) {
-      clearTimeout(timer); socket.destroy();
-      error ? reject(error) : resolve(value);
-    }
-    socket.on('error', error => finish(error));
-    socket.on('end', () => finish(new Error('DSP closed connection')));
-    socket.on('data', chunk => {
-      for (const byte of chunk) {
-        if (state === 'iac') {
-          if ([251,252,253,254].includes(byte)) { verb = byte; state = 'option'; }
-          else if (byte === 250) state = 'sub';
-          else state = 'data';
-        } else if (state === 'option') {
-          if (verb === 253) socket.write(Buffer.from([255,252,byte]));
-          if (verb === 251) socket.write(Buffer.from([255,254,byte]));
-          state = 'data';
-        } else if (state === 'sub') { if (byte === 255) state = 'subiac'; }
-        else if (state === 'subiac') state = byte === 240 ? 'data' : 'sub';
-        else if (byte === 255) state = 'iac';
-        else buffer += String.fromCharCode(byte);
-      }
-      if (!sent && buffer.includes('Welcome to the Tesira Text Protocol Server')) {
-        sent = true; buffer = ''; socket.write(text + '\r\n'); return;
-      }
-      if (!sent) return;
-      const match = buffer.match(/(?:^|[\r\n])([+-](?:OK|ERR)[^\r\n]*)[\r\n]/);
-      if (match) match[1].startsWith('-ERR') ? finish(new Error(match[1])) : finish(null, match[1]);
-      if (buffer.length > 65536) finish(new Error('Oversized DSP response'));
+// One in-flight command per session. Any transport ambiguity destroys the session.
+export class TTP {
+  constructor(host, port, timeout = 4000) {
+    this.host=host;this.port=port;this.timeout=timeout;
+    this.socket=null;this.pending=null;this.connecting=null;
+  }
+  close(error = new Error('DSP disconnected')) {
+    const socket=this.socket;this.socket=null;this.ready=false;
+    this.rejectConnect?.(error);this.rejectConnect=null;
+    if(this.pending){const p=this.pending;this.pending=null;clearTimeout(p.timer);p.reject(error);}
+    socket?.destroy();
+  }
+  async connect() {
+    if(this.ready && this.socket && !this.socket.destroyed)return;
+    if(this.connecting)return this.connecting;
+    this.connecting=new Promise((resolve,reject)=>{
+      const socket=net.createConnection({host:this.host,port:this.port});this.socket=socket;
+      socket.setNoDelay(true);
+      let buffer='',state='data',verb;
+      const timer=setTimeout(()=>this.close(new Error('DSP connection timed out')),this.timeout);
+      this.rejectConnect=error=>{clearTimeout(timer);reject(error);};
+      socket.on('error',error=>{if(this.socket===socket)this.close(error);});
+      socket.on('close',()=>{if(this.socket===socket)this.close(new Error('DSP closed connection'));});
+      socket.on('data',chunk=>{
+        if(this.socket!==socket)return;
+        for(const byte of chunk){
+          if(state==='iac'){
+            if([251,252,253,254].includes(byte)){verb=byte;state='option';}
+            else if(byte===250)state='sub';else state='data';
+          }else if(state==='option'){
+            if(verb===253)socket.write(Buffer.from([255,252,byte]));
+            if(verb===251)socket.write(Buffer.from([255,254,byte]));
+            state='data';
+          }else if(state==='sub'){if(byte===255)state='subiac';}
+          else if(state==='subiac')state=byte===240?'data':'sub';
+          else if(byte===255)state='iac';else buffer+=String.fromCharCode(byte);
+        }
+        if(!this.ready && buffer.includes('Welcome to the Tesira Text Protocol Server')){
+          this.ready=true;clearTimeout(timer);this.rejectConnect=null;buffer='';resolve();
+        }
+        let match;
+        while((match=buffer.match(/^[^\r\n]*[\r\n]+/))){
+          const line=match[0].trim();buffer=buffer.slice(match[0].length);
+          if(!/^[+-](OK|ERR)(?:\s|$)/.test(line))continue;
+          const p=this.pending;
+          if(!p){this.close(new Error('Unexpected DSP response'));return;}
+          this.pending=null;clearTimeout(p.timer);
+          if(line.startsWith('-ERR'))p.reject(new Error(line));else p.resolve(line);
+        }
+        if(buffer.length>65536)this.close(new Error('Oversized DSP response'));
+      });
     });
-  });
+    try{await this.connecting;}finally{this.connecting=null;}
+  }
+  async send(text){
+    await this.connect();
+    if(this.pending)throw new Error('Concurrent TTP command');
+    return new Promise((resolve,reject)=>{
+      const timer=setTimeout(()=>this.close(new Error('DSP response timed out')),this.timeout);
+      this.pending={resolve,reject,timer};
+      this.socket.write(text+'\r\n');
+    });
+  }
+}
+
+export async function command(host,port,text,timeout=4000){
+  const client=new TTP(host,port,timeout);
+  try{return await client.send(text);}finally{client.close();}
 }
 
 export function parseValue(response) {
@@ -49,10 +81,12 @@ export function parseValue(response) {
 export class DSP {
   constructor({host, port = 23, mainMin = -24, mainMax = 12, subMin = -100, subMax = 12, timeout = 4000}) {
     this.host = host; this.port = port; this.timeout = timeout; this.tail = Promise.resolve();
+    this.client = new TTP(host, port, timeout);
     this.limits = {main:{min:mainMin,max:mainMax},sub:{min:subMin,max:subMax}};
   }
   serial(fn) { const task = this.tail.then(fn); this.tail = task.catch(() => {}); return task; }
-  send(text) { return command(this.host, this.port, text, this.timeout); }
+  send(text) { return this.client.send(text); }
+  close() { this.client.close(); }
   async read() {
     const main = parseValue(await this.send('Level5 get levels'));
     const sub = parseValue(await this.send('Level4 get level 1'));
