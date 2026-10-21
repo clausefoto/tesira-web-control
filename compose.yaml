@@ -1,0 +1,11 @@
+services:
+  tesira-web-control:
+    build: .
+    image: tesira-web-control:local
+    container_name: tesira-web-control
+    restart: unless-stopped
+    ports:
+      - "${WEB_PORT:-8088}:8088"
+    env_file: .env
+    environment:
+      PORT: 8088

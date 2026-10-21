@@ -52,6 +52,10 @@ Level5 set level <channel 1–6> <dB>
 
 No write commands have been tested during this project's verification so far.
 
+## Initial implementation
+
+The backend now uses acknowledged per-channel writes and readback, tested against a simulator. Physical writes remain unverified. It polls actual state every three seconds while the page is visible; subscriptions are deferred. Each command owns a short-lived Telnet session, and operations are serialized.
+
 ## Backend requirements
 
 - Read state before enabling volume controls.
@@ -61,7 +65,7 @@ No write commands have been tested during this project's verification so far.
 - Read back levels after writes; surface partial failures affecting main channels.
 - Show individual main values if channels differ rather than silently overwriting them.
 - Disable controls while disconnected or state is unknown.
-- Recreate subscriptions after reconnection; verify subscription behavior on hardware.
+- If subscriptions are added later, recreate them after reconnection and verify behavior on hardware.
 - Limit slider command frequency and avoid a backlog of stale volume requests.
 - Confirm block limits before choosing final dashboard slider ranges.
 

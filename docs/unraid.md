@@ -1,47 +1,36 @@
-# Unraid hosting plan
+# Unraid operations
 
-Deployment instructions will be finalized once the application is implemented and tested.
+Follow the [README quick start](../README.md#quick-start-on-unraid) for initial setup. The container needs outbound TCP access to the DSP on port 23 and an inbound published dashboard port. No host networking, USB mapping, or privileged mode is required.
 
-## Intended setup
+Give the DSP a stable IP using a DHCP reservation or suitable static configuration. Keep `.env` on Unraid and out of Git.
 
-- One Docker container running a lightweight Node.js backend and the dashboard.
-- A configurable host port, initially proposed as 8088.
-- Docker bridge networking with a published dashboard port.
-- Outbound access from the container to the DSP on TCP port 23.
-- Automatic restart unless manually stopped.
-- Local configuration stored under an Unraid appdata directory.
+## Updating a manually launched container
 
-The dashboard URL will have the form `http://<unraid-address>:<dashboard-port>`. A phone on the home Wi-Fi can open it and save a home-screen shortcut.
+```bash
+cd /mnt/user/appdata/tesira-web-control
+git pull --ff-only
+docker build -t tesira-web-control:local .
+docker stop tesira-web-control
+docker rm tesira-web-control
+docker run -d --name tesira-web-control --restart unless-stopped \
+  -p 8088:8088 --env-file .env tesira-web-control:local
+```
 
-## DSP preparation
+This recreates only this container. DSP settings remain on the DSP; there is no app volume database to restore.
 
-- Enable Telnet in Tesira network settings.
-- Give the DSP a stable address using a DHCP reservation or a suitable static configuration.
-- Confirm reachability from Unraid before starting the application.
-- Confirm instance tags, channel numbers, and DSP level limits.
+For Compose deployments, run `git pull --ff-only` followed by `docker compose up -d --build` instead.
 
-Telnet connectivity from the target Unraid server has already been verified.
+## Configuration changes
 
-## Configuration to support
+After changing `.env`, recreate the container using the same launch method. For Compose, use `docker compose up -d --force-recreate`. Restarting an existing manually created container alone will not reload environment variables.
 
-- DSP host and port.
-- Main block tag and channel list.
-- Subwoofer block tag and channel.
-- Independent minimum and maximum dashboard levels.
-- Dashboard listen port.
+## Hardware acceptance checks
 
-Actual addresses belong in local configuration, not committed examples.
+- Startup and restart leave levels unchanged.
+- Main control updates all six intended channels.
+- Sub control changes only the intended block.
+- Tesira software changes appear within the next successful refresh.
+- DSP loss disables controls; recovery reads current state without applying cached levels.
+- Backend rejects invalid and out-of-range input.
 
-## Access
-
-This initial design is for a trusted local network. Telnet is unencrypted. Do not publish either the DSP's Telnet port or an unauthenticated dashboard to the internet.
-
-## Acceptance checks
-
-1. Opening or restarting the dashboard does not change DSP levels.
-2. Main adjustment updates all six intended channels.
-3. Sub adjustment updates only the intended subwoofer control.
-4. Changes in Tesira software appear on the dashboard.
-5. Disconnecting the DSP disables controls and shows connection loss.
-6. Reconnection reads current state without applying stale settings.
-7. Invalid or out-of-range requests are rejected by the backend.
+The simulator tests pass, but these physical checks and a Docker build must be completed on the target server.
