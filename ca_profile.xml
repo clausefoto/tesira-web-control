@@ -1,0 +1,7 @@
+<?xml version="1.0" encoding="utf-8"?>
+<CommunityApplications>
+  <Profile>Independent browser-based controls for Biamp Tesira DSPs, maintained by Matt Clausen. Tesira Web Control provides main and subwoofer level controls from phones, tablets, and desktop browsers. Support and bug reports: https://github.com/clausefoto/tesira-web-control/issues</Profile>
+  <Icon>https://raw.githubusercontent.com/clausefoto/tesira-web-control/main/icon.svg</Icon>
+  <WebPage>https://github.com/clausefoto/tesira-web-control</WebPage>
+  <Forum>https://github.com/clausefoto/tesira-web-control/issues</Forum>
+</CommunityApplications>

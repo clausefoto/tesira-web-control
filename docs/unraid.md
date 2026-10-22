@@ -40,6 +40,10 @@ The original volume controls and Docker deployment have been reported working on
 
 Open **Settings** in the dashboard. Each group has an instance tag, channel count (1–32), and Gang toggle. Counts select channels 1 through N; the DSP block must expose numbered channels. The Gang switch links dashboard writes and does not change DSP block ganging. Saving configuration does not alter DSP volume levels.
 
-Settings are saved as `/data/settings.json` in Docker. The image runs as user 1000. A new named Docker volume is initialized with suitable permissions. For a bind mount, create the chosen directory and give user 1000 write access before mounting it at `/data`. Outside Docker, the default is `./data/settings.json`; `SETTINGS_FILE` overrides the path.
+Settings are saved as `/data/settings.json` in Docker. The image initializes `/data` ownership, then runs the service as `PUID:PGID` (default 1000:1000; the Unraid template uses 99:100). A non-root Docker `--user` skips initialization and requires suitable directory permissions. Outside Docker, the default is `./data/settings.json`; `SETTINGS_FILE` overrides the path.
 
 Existing installations retain the original defaults until settings are saved: main `Level5`, six channels, Gang on; sub `Level4`, one channel, Gang on.
+
+## Community Applications packaging
+
+See [publishing instructions](publishing.md) for the beta image and submission process. Container template fields now set initial Main and Subwoofer tags, channel counts, and Gang defaults. Saved dashboard settings override these defaults. DSP address and volume limits continue to use environment variables.

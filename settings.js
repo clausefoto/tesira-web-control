@@ -19,9 +19,19 @@ export function validateControls(input) {
   }
   return result;
 }
-export async function loadControls(path) {
+export function controlsFromEnvironment(env=process.env) {
+  const controls={};
+  for(const key of ['main','sub']){
+    const prefix=key.toUpperCase(),original=defaultControls[key];
+    const gang=String(env[`${prefix}_GANG`]??original.gang).toLowerCase();
+    if(!['true','false'].includes(gang))throw new Error(`${prefix}_GANG must be true or false`);
+    controls[key]={tag:env[`${prefix}_TAG`]??original.tag,channels:Number(env[`${prefix}_CHANNELS`]??original.channels),gang:gang==='true'};
+  }
+  return validateControls(controls);
+}
+export async function loadControls(path, fallback=defaultControls) {
   try{return validateControls(JSON.parse(await readFile(path,'utf8')));}
-  catch(e){if(e.code==='ENOENT')return validateControls(defaultControls);throw e;}
+  catch(e){if(e.code==='ENOENT')return validateControls(typeof fallback==='function'?fallback():fallback);throw e;}
 }
 export async function saveControls(path,controls) {
   const validated=validateControls(controls);

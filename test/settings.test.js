@@ -17,3 +17,14 @@ test('reject command injection, invalid counts, and missing gang state',()=>{
    assert.throws(()=>validateControls({...defaultControls,main:{...defaultControls.main,...patch}}));
  }
 });
+
+test('container fields supply initial defaults and saved settings take priority',async t=>{
+ const {controlsFromEnvironment}=await import('../settings.js');
+ const env={MAIN_TAG:'Stereo',MAIN_CHANNELS:'2',MAIN_GANG:'false',SUB_TAG:'Bass',SUB_CHANNELS:'1',SUB_GANG:'true'};
+ const initial=controlsFromEnvironment(env);assert.deepEqual(initial.main,{tag:'Stereo',channels:2,gang:false});
+ assert.throws(()=>controlsFromEnvironment({...env,MAIN_GANG:'yes'}),/true or false/);
+ const dir=await mkdtemp(join(tmpdir(),'tesira-defaults-'));t.after(()=>rm(dir,{recursive:true,force:true}));
+ const file=join(dir,'settings.json');assert.deepEqual(await loadControls(file,()=>controlsFromEnvironment(env)),initial);
+ await saveControls(file,defaultControls);
+ assert.deepEqual(await loadControls(file,()=>{throw Error('Saved settings must win');}),defaultControls);
+});

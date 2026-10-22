@@ -14,7 +14,7 @@ Biamp's [Canvas system requirements](https://canvas-help.biamp.com/Biamp_Canvas_
 
 Working on the target Unraid and Biamp Tesira DSP setup. The owner has confirmed that the dashboard and volume adjustments work properly after the persistent Telnet connection update resolved the earlier delay. No measured hardware latency is claimed.
 
-The automated suite has 18 passing tests covering TTP, refresh behavior, configurable channel targeting, saved settings across restarts, and stale-mapping rejection. The new settings panel and mappings still need verification on physical hardware. Physical disconnect/recovery testing and compatibility with other Tesira designs are not yet confirmed.
+The automated suite has 19 passing tests covering TTP, refresh behavior, configurable channel targeting, saved settings across restarts, and stale-mapping rejection. The new settings panel and mappings still need verification on physical hardware. Physical disconnect/recovery testing and compatibility with other Tesira designs are not yet confirmed.
 
 ## Features
 
@@ -39,6 +39,12 @@ The running dashboard, showing main and subwoofer volume controls.
 
 <img src="docs/images/dashboard.png" alt="Tesira Web Control dashboard with main volume and subwoofer sliders" width="420">
 
+
+## Unraid Community Applications
+
+Beta submission packaging is included in `templates/tesira-web-control.xml` and `ca_profile.xml`. The published-image target is `ghcr.io/clausefoto/tesira-web-control:beta`. Check the [Actions builds](https://github.com/clausefoto/tesira-web-control/actions) and [publishing guide](docs/publishing.md) for image availability and remaining submission steps. Inclusion in the Apps catalog is pending Community Applications validation and review.
+
+The Unraid installation form provides initial tags, channel counts, and Gang settings. Saved dashboard settings take priority.
 
 ## Quick start on Unraid
 
@@ -89,6 +95,10 @@ With Gang on, adjustments set all configured channels in that group to the same 
 |---|---|---|
 | DSP_HOST | documentation-only example address | DSP control-network IP |
 | DSP_PORT | 23 | Telnet port |
+| MAIN_TAG / SUB_TAG | Level5 / Level4 | Initial instance tags |
+| MAIN_CHANNELS / SUB_CHANNELS | 6 / 1 | Initial channel counts (1–32) |
+| MAIN_GANG / SUB_GANG | true / true | Initial linked controls; true or false |
+| PUID / PGID | 1000 / 1000 | Service identity; Unraid template uses 99 / 100 |
 | WEB_PORT | 8088 | Compose host port |
 | PORT | 8088 | App listen port; leave at 8088 in Docker |
 | MAIN_MIN_DB / MAIN_MAX_DB | -24 / 12 | Main slider limits |
@@ -99,6 +109,8 @@ Open **Settings** in the dashboard to enter each group’s exact instance tag, c
 Saving settings does not write volume levels to the DSP. Docker stores settings in `/data/settings.json`; preserve the `tesira-web-control-data` volume when recreating the container. Outside Docker, settings use `./data/settings.json`. Set `SETTINGS_FILE` to override the path. Native DSP blocks that require channel index 0 are not supported by this dashboard linking mode.
 
  Match configured limits to the DSP block limits. Changing `.env` requires recreating the container. Actual addresses and credentials should remain in ignored local files.
+
+Environment mapping fields supply defaults only when no saved settings file exists. Dashboard changes are saved separately and survive image updates. The Docker entrypoint initializes data-directory ownership and then drops to the configured non-root service user.
 
 ## Development
 
@@ -135,3 +147,7 @@ See [protocol verification](docs/protocol.md) and [Unraid operations](docs/unrai
 [Biamp Tesira Text Protocol reference](https://support.biamp.com/Tesira/Control/Tesira_Text_Protocol).
 
 Independent project; not affiliated with Biamp.
+
+## License
+
+[MIT](LICENSE) · Copyright 2026 Matt Clausen.

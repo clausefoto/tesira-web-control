@@ -1,0 +1,39 @@
+<?xml version='1.0' encoding='utf-8'?>
+<Container version="2">
+  <Name>tesira-web-control</Name>
+  <Repository>ghcr.io/clausefoto/tesira-web-control:beta</Repository>
+  <Registry>https://github.com/clausefoto/tesira-web-control/pkgs/container/tesira-web-control</Registry>
+  <Network>bridge</Network>
+  <Shell>sh</Shell>
+  <Privileged>false</Privileged>
+  <Support>https://github.com/clausefoto/tesira-web-control/issues</Support>
+  <Project>https://github.com/clausefoto/tesira-web-control</Project>
+  <Overview>Control Biamp Tesira main and subwoofer volume from a phone or tablet browser. Requires a reachable Tesira DSP with Telnet enabled. Set your instance tags and channel counts during installation, or change them in the dashboard. Gang links dashboard channel sliders; it does not change DSP block ganging. Trusted local networks only; no authentication. Preset selection is planned.</Overview>
+  <Category>MediaApp:Music Tools:Utilities</Category>
+  <WebUI>http://[IP]:[PORT:8088]</WebUI>
+  <TemplateURL>https://raw.githubusercontent.com/clausefoto/tesira-web-control/main/templates/tesira-web-control.xml</TemplateURL>
+  <ReadMe>https://raw.githubusercontent.com/clausefoto/tesira-web-control/main/README.md</ReadMe>
+  <Icon>https://raw.githubusercontent.com/clausefoto/tesira-web-control/main/icon.svg</Icon>
+  <Screenshot>https://raw.githubusercontent.com/clausefoto/tesira-web-control/main/docs/images/dashboard.png</Screenshot>
+  <Beta>true</Beta>
+  <License>MIT</License>
+  <Requires>Biamp Tesira DSP with Telnet enabled and network access to its control interface. Linux amd64 image.</Requires>
+  <ExtraSearchTerms>biamp tesira dsp audio volume canvas subwoofer</ExtraSearchTerms>
+  <Date>2026-10-21</Date>
+  <Config Name="WebUI port" Target="8088" Default="8088" Mode="tcp" Description="HTTP dashboard port." Type="Port" Display="always" Required="true" Mask="false">8088</Config>
+  <Config Name="Appdata" Target="/data" Default="/mnt/user/appdata/tesira-web-control/config" Mode="rw" Description="Stores saved dashboard settings. Do not use the source checkout directory for a new installation." Type="Path" Display="always" Required="true" Mask="false">/mnt/user/appdata/tesira-web-control/config</Config>
+  <Config Name="DSP address" Target="DSP_HOST" Default="" Mode="" Description="Required: your Tesira control-network IP address or hostname." Type="Variable" Display="always" Required="true" Mask="false" />
+  <Config Name="DSP Telnet port" Target="DSP_PORT" Default="23" Mode="" Description="Tesira Telnet port." Type="Variable" Display="advanced" Required="true" Mask="false">23</Config>
+  <Config Name="Main instance tag" Target="MAIN_TAG" Default="Level5" Mode="" Description="Initial main-level instance tag. Case sensitive. Saved dashboard settings take priority." Type="Variable" Display="always" Required="true" Mask="false">Level5</Config>
+  <Config Name="Main channels" Target="MAIN_CHANNELS" Default="6|1|2|3|4|5|7|8|9|10|11|12|13|14|15|16|17|18|19|20|21|22|23|24|25|26|27|28|29|30|31|32" Mode="" Description="Initial number of main channels, 1 through 32; controls channels 1 through N." Type="Variable" Display="always" Required="true" Mask="false">6</Config>
+  <Config Name="Gang main channels" Target="MAIN_GANG" Default="true|false" Mode="" Description="Initial dashboard linking: true sets channels together; false exposes individual sliders." Type="Variable" Display="always" Required="true" Mask="false">true</Config>
+  <Config Name="Subwoofer instance tag" Target="SUB_TAG" Default="Level4" Mode="" Description="Initial subwoofer instance tag. Case sensitive. Saved dashboard settings take priority." Type="Variable" Display="always" Required="true" Mask="false">Level4</Config>
+  <Config Name="Subwoofer channels" Target="SUB_CHANNELS" Default="1|2|3|4|5|6|7|8|9|10|11|12|13|14|15|16|17|18|19|20|21|22|23|24|25|26|27|28|29|30|31|32" Mode="" Description="Initial number of subwoofer channels, 1 through 32." Type="Variable" Display="always" Required="true" Mask="false">1</Config>
+  <Config Name="Gang subwoofer channels" Target="SUB_GANG" Default="true|false" Mode="" Description="Initial dashboard linking for the subwoofer channels." Type="Variable" Display="always" Required="true" Mask="false">true</Config>
+  <Config Name="Main minimum dB" Target="MAIN_MIN_DB" Default="-24" Mode="" Description="Minimum allowed main volume." Type="Variable" Display="advanced" Required="true" Mask="false">-24</Config>
+  <Config Name="Main maximum dB" Target="MAIN_MAX_DB" Default="12" Mode="" Description="Maximum allowed main volume; match your DSP block limits." Type="Variable" Display="advanced" Required="true" Mask="false">12</Config>
+  <Config Name="Subwoofer minimum dB" Target="SUB_MIN_DB" Default="-100" Mode="" Description="Minimum allowed subwoofer volume." Type="Variable" Display="advanced" Required="true" Mask="false">-100</Config>
+  <Config Name="Subwoofer maximum dB" Target="SUB_MAX_DB" Default="12" Mode="" Description="Maximum allowed subwoofer volume; match your DSP block limits." Type="Variable" Display="advanced" Required="true" Mask="false">12</Config>
+  <Config Name="App user ID" Target="PUID" Default="99" Mode="" Description="Non-root UID that owns saved settings." Type="Variable" Display="advanced" Required="true" Mask="false">99</Config>
+  <Config Name="App group ID" Target="PGID" Default="100" Mode="" Description="Non-root GID that owns saved settings." Type="Variable" Display="advanced" Required="true" Mask="false">100</Config>
+</Container>

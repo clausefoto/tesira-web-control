@@ -1,0 +1,102 @@
+name: Test and publish beta image
+on:
+  push:
+    branches: [main]
+    paths:
+      - '*.js'
+      - 'package.json'
+      - 'public/**'
+      - 'test/**'
+      - 'Dockerfile'
+      - 'docker-entrypoint.sh'
+      - '.dockerignore'
+      - '.github/workflows/publish.yml'
+      - 'templates/**'
+      - 'ca_profile.xml'
+  pull_request:
+  workflow_dispatch:
+permissions:
+  contents: read
+concurrency:
+  group: publish-${{ github.ref }}
+  cancel-in-progress: false
+jobs:
+  test-build-publish:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    permissions:
+      contents: read
+      packages: write
+    steps:
+      - uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6
+      - uses: actions/setup-node@249970729cb0ef3589644e2896645e5dc5ba9c38 # v6
+        with:
+          node-version: '24'
+      - name: Test application
+        run: npm test
+      - name: Validate submission XML and entrypoint
+        run: |
+          python3 - <<'PY'
+          import xml.etree.ElementTree as E
+          profile=E.parse('ca_profile.xml').getroot()
+          assert profile.findtext('Profile').strip()
+          template=E.parse('templates/tesira-web-control.xml').getroot()
+          assert template.tag=='Container' and template.attrib['version']=='2'
+          for field in ['Name','Repository','Support','Project','TemplateURL','WebUI','License']:
+              assert template.findtext(field).strip(), field
+          targets=[c.attrib['Target'] for c in template.findall('Config')]
+          assert len(targets)==len(set(targets))
+          PY
+          sh -n docker-entrypoint.sh
+      - name: Build image
+        run: docker build --platform linux/amd64 -t tesira-smoke .
+      - name: Test image, permissions, and persistent settings
+        run: |
+          mkdir -p "$RUNNER_TEMP/tesira-smoke-data"
+          docker run -d --name tesira-smoke -p 127.0.0.1::8088 \
+            -e PUID=99 -e PGID=100 -e MAIN_TAG=InitialMain \
+            -v "$RUNNER_TEMP/tesira-smoke-data:/data" tesira-smoke
+          host_port=$(docker port tesira-smoke 8088/tcp | cut -d: -f2)
+          export TEST_URL="http://127.0.0.1:$host_port"
+          for attempt in $(seq 1 20); do
+            if curl -fsS "$TEST_URL/health"; then break; fi
+            sleep 1
+          done
+          curl -fsS "$TEST_URL/health"
+          test "$(docker exec tesira-smoke id -u)" = '99'
+          node --input-type=module <<'JS'
+          import assert from 'node:assert/strict';
+          const base=process.env.TEST_URL;
+          const initial=await(await fetch(base+'/api/settings')).json();
+          assert.equal(initial.controls.main.tag,'InitialMain');
+          initial.controls.main.tag='PersistedMain';
+          const save=await fetch(base+'/api/settings',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(initial)});
+          assert.equal(save.status,200);
+          JS
+          docker restart tesira-smoke
+          for attempt in $(seq 1 20); do
+            if curl -fsS "$TEST_URL/health"; then break; fi
+            sleep 1
+          done
+          node --input-type=module <<'JS'
+          import assert from 'node:assert/strict';
+          const saved=await(await fetch(process.env.TEST_URL+'/api/settings')).json();
+          assert.equal(saved.controls.main.tag,'PersistedMain');
+          JS
+      - name: Publish beta image
+        if: github.event_name != 'pull_request' && github.ref == 'refs/heads/main'
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          image="ghcr.io/${GITHUB_REPOSITORY,,}"
+          printf '%s' "$GH_TOKEN" | docker login ghcr.io --username "$GITHUB_ACTOR" --password-stdin
+          docker tag tesira-smoke "$image:beta"
+          docker tag tesira-smoke "$image:sha-$GITHUB_SHA"
+          docker push "$image:beta"
+          docker push "$image:sha-$GITHUB_SHA"
+          docker logout ghcr.io
+      - name: Container logs and cleanup
+        if: always()
+        run: |
+          docker logs tesira-smoke || true
+          docker rm -f tesira-smoke || true

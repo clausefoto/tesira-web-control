@@ -1,7 +1,7 @@
 import http from 'node:http';
 import {readFile} from 'node:fs/promises';
 import {DSP} from './ttp.js';
-import {loadControls, saveControls, validateControls} from './settings.js';
+import {loadControls, saveControls, validateControls, controlsFromEnvironment} from './settings.js';
 
 const numeric=(key,fallback)=>{
   const n=Number(process.env[key]??fallback);
@@ -12,7 +12,7 @@ const settingsFile=process.env.SETTINGS_FILE || './data/settings.json';
 const dsp=new DSP({host:process.env.DSP_HOST || '192.0.2.10',port:numeric('DSP_PORT',23),
   mainMin:numeric('MAIN_MIN_DB',-24),mainMax:numeric('MAIN_MAX_DB',12),
   subMin:numeric('SUB_MIN_DB',-100),subMax:numeric('SUB_MAX_DB',12),
-  controls:await loadControls(settingsFile)});
+  controls:await loadControls(settingsFile,()=>controlsFromEnvironment())});
 for(const limit of Object.values(dsp.limits))if(limit.min>=limit.max)throw new Error('Minimum must be below maximum');
 const assets={'/':['public/index.html','text/html'],'/app.js':['public/app.js','text/javascript'],'/style.css':['public/style.css','text/css']};
 let pending=0;
