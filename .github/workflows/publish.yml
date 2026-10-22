@@ -74,6 +74,8 @@ jobs:
           assert.equal(save.status,200);
           JS
           docker restart tesira-smoke
+          host_port=$(docker port tesira-smoke 8088/tcp | cut -d: -f2)
+          export TEST_URL="http://127.0.0.1:$host_port"
           for attempt in $(seq 1 20); do
             if curl -fsS "$TEST_URL/health"; then break; fi
             sleep 1
