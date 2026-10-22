@@ -2,9 +2,19 @@
 
 A mobile-friendly dashboard for main and subwoofer volume on a Biamp Tesira DSP. Runs as one Docker container on Unraid, with no runtime npm dependencies.
 
+## Why this exists
+
+Biamp Canvas is Windows-only control software, so its control surfaces cannot run natively on iPads, iPhones, or Android phones. I wanted a simple way to adjust my Tesira system from my phone without opening a Windows computer.
+
+Tesira Web Control provides a browser-based dashboard hosted on my Unraid server. The server communicates directly with the DSP using Tesira Text Protocol (TTP), while a phone or tablet only needs a browser on the local network. The initial goal is straightforward: main and subwoofer volume control, with preset buttons planned for later.
+
+Biamp's [Canvas system requirements](https://canvas-help.biamp.com/Biamp_Canvas_Help/Introduction/Architect_and_Engineer_Specification.html) list Windows as the supported operating system. This dashboard is an independent project focused on a small set of everyday controls.
+
 ## Status
 
-Initial implementation, tested against a simulated DSP. Dashboard reads, writes, and Docker deployment have been reported working on the target Unraid/DSP setup. The persistent-connection latency improvement still needs timing verification on hardware.
+Working on the target Unraid and Biamp Tesira DSP setup. The owner has confirmed that the dashboard and volume adjustments work properly after the persistent Telnet connection update resolved the earlier delay. No measured hardware latency is claimed.
+
+The automated suite has 10 passing tests covering the TTP client and dashboard refresh behavior. Physical disconnect/recovery testing and compatibility with other Tesira designs are not yet confirmed.
 
 ## Features
 
