@@ -1,4 +1,5 @@
 import net from 'node:net';
+import {defaultControls, validateControls, instanceTag} from './settings.js';
 
 // One in-flight command per session. Any transport ambiguity destroys the session.
 export class TTP {
@@ -79,36 +80,61 @@ export function parseValue(response) {
 }
 
 export class DSP {
-  constructor({host, port = 23, mainMin = -24, mainMax = 12, subMin = -100, subMax = 12, timeout = 4000}) {
+  constructor({host, port = 23, mainMin = -24, mainMax = 12, subMin = -100, subMax = 12, timeout = 4000, controls = defaultControls}) {
     this.host = host; this.port = port; this.timeout = timeout; this.tail = Promise.resolve();
     this.client = new TTP(host, port, timeout);
+    this.controls = validateControls(controls);
     this.limits = {main:{min:mainMin,max:mainMax},sub:{min:subMin,max:subMax}};
   }
   serial(fn) { const task = this.tail.then(fn); this.tail = task.catch(() => {}); return task; }
   send(text) { return this.client.send(text); }
   close() { this.client.close(); }
+  get settingsKey() { return JSON.stringify(this.controls); }
   async read() {
-    const main = parseValue(await this.send('Level5 get levels'));
-    const sub = parseValue(await this.send('Level4 get level 1'));
-    if (main.length !== 6 || sub.length !== 1) throw new Error('Unexpected DSP channel count');
-    return {main, sub:sub[0], limits:this.limits};
+    const levels={};
+    for(const key of ['main','sub']) {
+      const config=this.controls[key],tag=instanceTag(config.tag);
+      const values=parseValue(await this.send(`${tag} get ${config.channels===1?'level 1':'levels'}`));
+      if(values.length<config.channels)throw new Error(`${key}: requested ${config.channels} channels but DSP returned ${values.length}`);
+      levels[key]=values.slice(0,config.channels);
+    }
+    return {main:levels.main,sub:levels.sub[0],levels,limits:this.limits,controls:this.controls,settingsKey:this.settingsKey};
   }
   get() { return this.serial(() => this.read()); }
-  set(control, value) {
-    const limits = this.limits[control];
-    if (!limits || typeof value !== 'number' || !Number.isFinite(value) || value < limits.min || value > limits.max)
-      return Promise.reject(new Error('Invalid control or level outside configured limits'));
-    return this.serial(async () => {
-      // Refuse writes unless both configured blocks can currently be read.
+  configure(controls,persist) {
+    const validated=validateControls(controls);
+    return this.serial(async()=>{
+      await persist(validated);
+      this.controls=validated;
+      this.client.close();
+      return {controls:this.controls,settingsKey:this.settingsKey};
+    });
+  }
+  validateWrite(control,value,channel,settingsKey) {
+    const limit=Object.hasOwn(this.limits,control)?this.limits[control]:null;
+    if(!limit || typeof value!=='number' || !Number.isFinite(value) || value<limit.min || value>limit.max)
+      throw new Error('Invalid control or level outside configured limits');
+    if(settingsKey!==undefined && settingsKey!==this.settingsKey)throw new Error('Settings changed; refresh controls before adjusting volume');
+    const config=this.controls[control];
+    if(!config.gang && (!Number.isInteger(channel) || channel<1 || channel>config.channels))
+      throw new Error('Select a valid individual channel');
+    if(config.gang && channel!==undefined)throw new Error('Individual channel writes are disabled while Gang is on');
+  }
+  set(control,value,channel,settingsKey) {
+    try{this.validateWrite(control,value,channel,settingsKey);}catch(error){return Promise.reject(error);}
+    return this.serial(async()=>{
+      this.validateWrite(control,value,channel,settingsKey);
+      // Check the configured blocks before any write, including after reconnects.
       await this.read();
-      const channels = control === 'main' ? [1,2,3,4,5,6] : [1];
+      const config=this.controls[control],tag=instanceTag(config.tag);
+      const channels=config.gang?Array.from({length:config.channels},(_,i)=>i+1):[channel];
       try {
-        for (const channel of channels) await this.send(`${control === 'main' ? 'Level5' : 'Level4'} set level ${channel} ${value}`);
-        const result = await this.read();
-        const actual = control === 'main' ? result.main : [result.sub];
-        if (actual.some(v => Math.abs(v - value) > 0.01)) throw new Error('DSP readback differs from requested level');
+        for(const index of channels)await this.send(`${tag} set level ${index} ${value}`);
+        const result=await this.read();
+        if(channels.some(index=>Math.abs(result.levels[control][index-1]-value)>0.01))
+          throw new Error('DSP readback differs from requested level');
         return result;
-      } catch (error) { throw new Error(`Volume update incomplete; refresh actual levels before retrying. ${error.message}`); }
+      }catch(error){throw new Error(`Volume update incomplete; refresh actual levels before retrying. ${error.message}`);}
     });
   }
 }

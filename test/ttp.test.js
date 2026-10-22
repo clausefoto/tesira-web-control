@@ -68,3 +68,37 @@ test('main update reuses one handshake and reconnects without replaying writes',
  const writes=s.writes.length;s.dsp.close();await s.dsp.get();
  assert.equal(s.connections,2);assert.equal(s.writes.length,writes);
 });
+
+test('unganged main writes only the selected channel; stale mapping is rejected',async t=>{
+ const s=await simulator(t);const settings={main:{tag:'Level5',channels:3,gang:false},sub:{tag:'Level4',channels:1,gang:true}};
+ const old=s.dsp.settingsKey;let saved;
+ await s.dsp.configure(settings,async c=>{saved=c;});assert.deepEqual(saved,settings);assert.equal(s.writes.length,0);
+ await assert.rejects(s.dsp.set('main',-9,2,old),/Settings changed/);
+ await assert.rejects(s.dsp.set('main',-9),/individual channel/);
+ await s.dsp.set('main',-9,2,s.dsp.settingsKey);assert.deepEqual(s.main,[-6,-9,-6,-6,-6,-6]);assert.equal(s.writes.length,1);
+});
+test('configured channel count is checked before writes',async t=>{
+ const s=await simulator(t);await s.dsp.configure({main:{tag:'Level5',channels:7,gang:true},sub:{tag:'Level4',channels:1,gang:true}},async()=>{});
+ await assert.rejects(s.dsp.set('main',-10),/requested 7 channels/);assert.equal(s.writes.length,0);
+});
+test('failed persistence keeps current mapping intact',async t=>{
+ const s=await simulator(t),old=s.dsp.settingsKey;
+ await assert.rejects(s.dsp.configure({main:{tag:'Other',channels:2,gang:true},sub:{tag:'Level4',channels:1,gang:true}},async()=>{throw Error('disk unavailable');}),/disk unavailable/);
+ assert.equal(s.dsp.settingsKey,old);assert.equal(s.writes.length,0);
+});
+
+test('custom instance tags and multi-channel sub controls use the configured commands',async()=>{
+ const dsp=new DSP({host:'unused',controls:{main:{tag:'My Main',channels:1,gang:true},sub:{tag:'Bass',channels:2,gang:true}}});
+ let main=-6,sub=[2,3];const commands=[];
+ dsp.send=async command=>{
+   commands.push(command);
+   if(command==='"My Main" get level 1')return `+OK "value":${main}`;
+   if(command==='Bass get levels')return `+OK "value":[${sub.join(' ')}]`;
+   const m=command.match(/^Bass set level ([12]) ([-\d.]+)$/);
+   if(m){sub[Number(m[1])-1]=Number(m[2]);return '+OK';}
+   throw Error('Unexpected command: '+command);
+ };
+ const result=await dsp.set('sub',-5);
+ assert.deepEqual(result.levels,{main:[-6],sub:[-5,-5]});
+ assert.deepEqual(commands.filter(c=>c.includes(' set ')),['Bass set level 1 -5','Bass set level 2 -5']);
+});

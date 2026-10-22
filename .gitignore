@@ -6,3 +6,4 @@ config.local.json
 *.log
 coverage/
 .DS_Store
+data/

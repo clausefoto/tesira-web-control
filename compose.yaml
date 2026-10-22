@@ -9,3 +9,8 @@ services:
     env_file: .env
     environment:
       PORT: 8088
+    volumes:
+      - tesira-web-control-data:/data
+volumes:
+  tesira-web-control-data:
+    name: tesira-web-control-data

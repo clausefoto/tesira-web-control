@@ -14,18 +14,20 @@ Biamp's [Canvas system requirements](https://canvas-help.biamp.com/Biamp_Canvas_
 
 Working on the target Unraid and Biamp Tesira DSP setup. The owner has confirmed that the dashboard and volume adjustments work properly after the persistent Telnet connection update resolved the earlier delay. No measured hardware latency is claimed.
 
-The automated suite has 10 passing tests covering the TTP client and dashboard refresh behavior. Physical disconnect/recovery testing and compatibility with other Tesira designs are not yet confirmed.
+The automated suite has 18 passing tests covering TTP, refresh behavior, configurable channel targeting, saved settings across restarts, and stale-mapping rejection. The new settings panel and mappings still need verification on physical hardware. Physical disconnect/recovery testing and compatibility with other Tesira designs are not yet confirmed.
 
 ## Features
 
-- Main slider sets `Level5` channels 1–6 equally.
-- Subwoofer slider sets `Level4` channel 1 independently.
+- Editable Main and Subwoofer instance tags (defaults: `Level5` and `Level4`).
+- Channel-count dropdowns (1–32) for each group.
+- Gang on: one slider sets the selected channels equally. Gang off: individual channel sliders.
+- Settings saved across restarts in a persistent Docker volume.
 - Large dB readouts, sliders, and 0.5 dB adjustment buttons.
 - Current levels read on connection; no startup/reconnect volume defaults.
 - Actual values refreshed every three seconds while the page is visible.
 - Configurable limits enforced by the backend.
 - Readback after writes and clear errors for partial main updates.
-- Controls disabled when disconnected or an operation is in progress.
+- Controls disabled when disconnected or a volume/settings write is in progress.
 
 ## Upcoming feature
 
@@ -57,7 +59,8 @@ Build and launch, without needing the Compose plugin:
 ```bash
 docker build -t tesira-web-control:local .
 docker run -d --name tesira-web-control --restart unless-stopped \
-  -p 8088:8088 --env-file .env tesira-web-control:local
+  -p 8088:8088 --env-file .env \
+  -v tesira-web-control-data:/data tesira-web-control:local
 ```
 
 Or, if Docker Compose is installed:
@@ -78,7 +81,7 @@ The plain `docker run` command always publishes port 8088; to change it, change 
 4. Change a level in Tesira and confirm the dashboard follows.
 5. Test DSP disconnection and recovery.
 
-Main adjustments set all six channels to the same value. If channels differ, the dashboard lists them before adjustment. Main channel writes are sequential, not atomic: a failure can leave only some channels changed. The app stops on the first failure, shows an error, and reads actual levels on the next refresh. It never automatically rolls back or retries a volume write.
+With Gang on, adjustments set all configured channels in that group to the same value. With Gang off, each channel has its own slider. If channels differ, the dashboard lists them before adjustment. Main channel writes are sequential, not atomic: a failure can leave only some channels changed. The app stops on the first failure, shows an error, and reads actual levels on the next refresh. It never automatically rolls back or retries a volume write.
 
 ## Configuration
 
@@ -91,7 +94,11 @@ Main adjustments set all six channels to the same value. If channels differ, the
 | MAIN_MIN_DB / MAIN_MAX_DB | -24 / 12 | Main slider limits |
 | SUB_MIN_DB / SUB_MAX_DB | -100 / 12 | Sub slider limits |
 
-Instance tags and main channel count are currently fixed to this DSP design. Match configured limits to the DSP block limits. Changing `.env` requires recreating the container. Actual addresses and credentials should remain in ignored local files.
+Open **Settings** in the dashboard to enter each group’s exact instance tag, choose its channel count, and switch Gang on or off. Channel counts select channels 1 through N; they do not create DSP channels. Gang links the dashboard controls and does not change the DSP block’s own ganging. The defaults preserve the original design: main `Level5` / 6 channels / Gang on; sub `Level4` / 1 channel / Gang on.
+
+Saving settings does not write volume levels to the DSP. Docker stores settings in `/data/settings.json`; preserve the `tesira-web-control-data` volume when recreating the container. Outside Docker, settings use `./data/settings.json`. Set `SETTINGS_FILE` to override the path. Native DSP blocks that require channel index 0 are not supported by this dashboard linking mode.
+
+ Match configured limits to the DSP block limits. Changing `.env` requires recreating the container. Actual addresses and credentials should remain in ignored local files.
 
 ## Development
 

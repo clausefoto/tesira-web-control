@@ -41,7 +41,7 @@ The observed subwoofer level was +12 dB. This is not a prescribed setting.
 
 ## Writes: pending physical verification
 
-Main control must adjust all six channels together. Before implementation, verify the supported bulk-set syntax against Biamp's block reference or command calculator. Otherwise use serialized per-channel set commands with acknowledgment checks and readback.
+The default main control adjusts six channels together. Editable mappings now allow other instance tags, channel counts, and individual channel control. Before implementation, verify the supported bulk-set syntax against Biamp's block reference or command calculator. Otherwise use serialized per-channel set commands with acknowledgment checks and readback.
 
 The expected single-channel form is:
 
@@ -55,6 +55,12 @@ No write commands have been tested during this project's verification so far.
 ## Initial implementation
 
 The backend now uses acknowledged per-channel writes and readback, tested against a simulator. Physical writes have since been reported working. It polls actual state every three seconds while the page is visible; subscriptions are deferred. Commands now share a persistent Telnet session with TCP_NODELAY. Operations are serialized. A timeout or disconnect discards the session; subsequent operations reconnect without replaying writes. This avoids repeated login/banner delays during a six-channel adjustment.
+
+## Configurable mappings
+
+Each dashboard group selects an instance tag, channel count from 1 to 32, and Gang mode. Channel counts address channels 1 through N; they do not create channels in the DSP. With Gang on, one slider sets all selected channels to the same value. Gang off requires an explicit channel and writes only that channel. This is dashboard linking, not DSP ganging; blocks requiring channel index 0 are not supported by this mode. Tags containing spaces are quoted.
+
+Saving settings writes only the local settings file. State reads and volume writes are serialized with mapping changes. Each dashboard write includes its mapping identity, so an outdated page cannot send a write against a changed mapping.
 
 ## Backend requirements
 
