@@ -63,7 +63,7 @@ jobs:
             sleep 1
           done
           curl -fsS "$TEST_URL/health"
-          test "$(docker exec tesira-smoke id -u)" = '99'
+          test "$(docker exec tesira-smoke awk '/^Uid:/{print $2}' /proc/1/status)" = '99'
           node --input-type=module <<'JS'
           import assert from 'node:assert/strict';
           const base=process.env.TEST_URL;
