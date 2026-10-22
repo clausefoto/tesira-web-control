@@ -27,7 +27,16 @@ The automated suite has 10 passing tests covering the TTP client and dashboard r
 - Readback after writes and clear errors for partial main updates.
 - Controls disabled when disconnected or an operation is in progress.
 
-Preset recall is planned for later.
+## Upcoming feature
+
+**Preset selection:** choose and recall saved Tesira presets directly from the dashboard. This feature is planned and is not available yet.
+
+## Screenshot
+
+The running dashboard, showing main and subwoofer volume controls.
+
+<img src="docs/images/dashboard.png" alt="Tesira Web Control dashboard with main volume and subwoofer sliders" width="420">
+
 
 ## Quick start on Unraid
 
